@@ -1,8 +1,32 @@
-const eventModel = require("../models/eventsModels")
+const eventModel = require("../models/eventsModels");
+
 const getAllEvents = async (req, res) => {
+  const { page = 1, limit = 10, status, organizerId } = req.query;
+  const skip = (page - 1) * limit;
+
+  let query = {};
+  if (status) query.status = status;
+  if (organizerId) query.organizerId = organizerId;
+
   try {
-    const events = await eventModel.find();
-    res.status(200).json({ message: "List of all events", events });
+    const events = await eventModel
+      .find(query)
+      .skip(skip)
+      .limit(parseInt(limit))
+      .sort({ date: 1 });
+
+    const total = await eventModel.countDocuments(query);
+
+    res.status(200).json({
+      message: "List of all events",
+      events,
+      pagination: {
+        page: parseInt(page),
+        limit: parseInt(limit),
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
+    });
   } catch (error) {
     console.error("Error retrieving events:", error);
     res.status(500).json({ message: "Internal server error." });
@@ -25,11 +49,17 @@ const createEvent = async (req, res) => {
     return res.status(400).json({ message: "Missing required event fields." });
   }
   // Logic to save the eventData to the database
-  await eventModel.create(eventData);
-  // For demonstration, we will just log the eventData
-  res
-    .status(201)
-    .json({ message: "Event created successfully", event: eventData });
+
+  try {
+    // Logic to save the eventData to the database
+    const createdEvent = await eventModel.create(eventData);
+    res
+      .status(201)
+      .json({ message: "Event created successfully", event: createdEvent });
+  } catch (error) {
+    console.error("Error creating event:", error);
+    res.status(500).json({ message: "Internal server error." });
+  }
 };
 
 const getEventById = async (req, res) => {
